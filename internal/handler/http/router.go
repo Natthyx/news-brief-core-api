@@ -22,13 +22,14 @@ type Router struct {
 
 func NewRouter(userUsecase contract.IUserUseCase, emailVerUC contract.IEmailVerificationUC, userRepo contract.IUserRepository, tokenRepo contract.ITokenRepository, hasher contract.IHasher, jwtService contract.IJWTService, mailService contract.IEmailService, logger contract.IAppLogger, config contract.IConfigProvider, validator contract.IValidator, uuidGen contract.IUUIDGenerator, randomGen contract.IRandomGenerator) *Router {
 	baseURL := config.GetAppBaseURL()
+	frontendURL := config.GetFrontendBaseURL()
 	return &Router{
 		userHandler: NewUserHandler(userUsecase),
 
 		emailHandler: NewEmailHandler(emailVerUC, userRepo, jwtService, tokenRepo, hasher, config, uuidGen),
 		userUsecase:  usecase.NewUserUsecase(userRepo, tokenRepo, emailVerUC, hasher, jwtService, mailService, logger, config, validator, uuidGen, randomGen),
 		jwtService:   jwtService,
-		authHandler:  NewAuthHandler(userUsecase, baseURL),
+		authHandler:  NewAuthHandler(userUsecase, baseURL, frontendURL, jwtService),
 	}
 }
 

@@ -151,7 +151,7 @@ func (uc *UserUsecase) Login(ctx context.Context, email, password string) (*enti
 
 	// Require verified email for login
 	if !user.IsVerified {
-		return nil, "", "", errors.New("account not verified. Please verify your email")
+		// Allow login but keep is_verified=false so client can prompt for verification
 	}
 
 	// Verify password

@@ -17,14 +17,18 @@ import (
 )
 
 type AuthHandler struct {
-	UserUseCase contract.IUserUseCase
-	BaseURL     string
+	UserUseCase      contract.IUserUseCase
+	BaseURL          string
+	FrontendBaseURL  string
+	jwtService       contract.IJWTService
 }
 
-func NewAuthHandler(uc contract.IUserUseCase, baseURL string) *AuthHandler {
+func NewAuthHandler(uc contract.IUserUseCase, baseURL string, frontendBaseURL string, jwtSvc contract.IJWTService) *AuthHandler {
 	return &AuthHandler{
-		UserUseCase: uc,
-		BaseURL:     baseURL,
+		UserUseCase:     uc,
+		BaseURL:         baseURL,
+		FrontendBaseURL: frontendBaseURL,
+		jwtService:      jwtSvc,
 	}
 }
 
@@ -115,6 +119,21 @@ func (h *AuthHandler) HandleGoogleCallback(ctx *gin.Context) {
 	accessToken, refershToken, err := h.UserUseCase.LoginWithOAuth(requestCtx, fName, lName, userInfo.Email)
 	if err != nil {
 		ctx.String(http.StatusInternalServerError, fmt.Sprintf("failed to login with OAuth: %v\n", err))
+		return
+	}
+
+	if h.FrontendBaseURL != "" {
+		u, _ := url.Parse(h.FrontendBaseURL)
+		u.Path = "/auth/verified"
+		fragment := url.Values{}
+		fragment.Set("access_token", accessToken)
+		fragment.Set("refresh_token", refershToken)
+		// try to get user id from access token claims
+		if claims, err := h.jwtService.ParseAccessToken(accessToken); err == nil {
+			fragment.Set("user_id", claims.UserID)
+		}
+		u.Fragment = fragment.Encode()
+		ctx.Redirect(http.StatusFound, u.String())
 		return
 	}
 

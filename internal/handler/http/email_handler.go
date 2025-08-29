@@ -1,7 +1,9 @@
 package http
 
 import (
+	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/RealEskalate/G6-NewsBrief/internal/domain/contract"
@@ -114,6 +116,21 @@ func (h *EmailHandler) HandleVerifyEmailToken(ctx *gin.Context) {
 	}
 
 	// success response with tokens
+	frontend := h.config.GetFrontendBaseURL()
+	if frontend != "" {
+		// Redirect to frontend with tokens in fragment to avoid server logs and referer leaks
+		u, _ := url.Parse(frontend)
+		# build a redirect URL like: FRONTEND_BASE_URL/auth/verified#access_token=...&refresh_token=...
+		u.Path = "/auth/verified"
+		fragment := url.Values{}
+		fragment.Set("access_token", accessToken)
+		fragment.Set("refresh_token", refreshToken)
+		fragment.Set("user_id", user.ID)
+		u.Fragment = fragment.Encode()
+		ctx.Redirect(http.StatusFound, u.String())
+		return
+	}
+
 	ctx.JSON(http.StatusOK, gin.H{
 		"message":       "Email verified successfully",
 		"user":          user,

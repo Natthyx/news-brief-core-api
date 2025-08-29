@@ -12,6 +12,7 @@ import (
 type Config struct {
 	SendActivationEmail          bool
 	AppBaseURL                   string
+	FrontendBaseURL              string
 	RefreshTokenExpiry           time.Duration
 	PasswordResetTokenExpiry     time.Duration
 	EmailVerificationTokenExpiry time.Duration
@@ -22,6 +23,7 @@ func NewConfig() contract.IConfigProvider {
 	return &Config{
 		SendActivationEmail:          getEnvAsBool("SEND_ACTIVATION_EMAIL", false),
 		AppBaseURL:                   getEnv("APP_BASE_URL", "http://localhost:8080"),
+		FrontendBaseURL:              getEnv("FRONTEND_BASE_URL", "http://localhost:5173"),
 		RefreshTokenExpiry:           time.Hour * time.Duration(getEnvAsInt("REFRESH_TOKEN_EXPIRY_HOURS", 168)), // 7 days
 		PasswordResetTokenExpiry:     time.Minute * time.Duration(getEnvAsInt("PASSWORD_RESET_TOKEN_EXPIRY_MINUTES", 15)),
 		EmailVerificationTokenExpiry: time.Minute * time.Duration(getEnvAsInt("EMAIL_VERIFICATION_TOKEN_EXPIRY_MINUTES", 60)),
@@ -36,6 +38,11 @@ func (c *Config) GetSendActivationEmail() bool {
 // GetAppBaseURL returns the base URL of the application.
 func (c *Config) GetAppBaseURL() string {
 	return c.AppBaseURL
+}
+
+// GetFrontendBaseURL returns the frontend application's base URL.
+func (c *Config) GetFrontendBaseURL() string {
+	return c.FrontendBaseURL
 }
 
 // GetRefreshTokenExpiry returns the expiry duration for refresh tokens.
