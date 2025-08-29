@@ -299,6 +299,11 @@ func (uc *UserUsecase) ForgotPassword(ctx context.Context, email string) error {
 		return fmt.Errorf("email not found: %w", err)
 	}
 
+	// Require verified users for password reset
+	if !user.IsVerified {
+		return fmt.Errorf("account not verified")
+	}
+
 	// Generate a password reset token/link
 	resetToken, err := uc.randomGenerator.GenerateRandomToken(32)
 	if err != nil {
@@ -334,7 +339,7 @@ func (uc *UserUsecase) ForgotPassword(ctx context.Context, email string) error {
 	// The reset link should use the unhashed token
 	emailSubject := "Password Reset Request"
 	resetLink := fmt.Sprintf("%s/reset-password?verifier=%s&token=%s", uc.config.GetAppBaseURL(), verifier, resetToken)
-	emailBody := fmt.Sprintf("Hi %s,\n\nYou have requested to reset your password. Please click the following link to reset your password: %s\n\nIf you did not request this, please ignore this email.\n\nThanks,\nThe Team", user.Username, resetLink)
+	emailBody := fmt.Sprintf("Hi %s,\n\nWe received a request to reset your password.\nUse the link below to set a new password.\n\n%s\n\nIf you did not request this, you can safely ignore this email.\n\nThanks,\nNewsBrief Team", user.Username, resetLink)
 
 	if err := uc.mailService.SendEmail(ctx, user.Email, emailSubject, emailBody); err != nil {
 		uc.logger.Errorf("failed to send password reset email to %s: %v", user.Email, err)

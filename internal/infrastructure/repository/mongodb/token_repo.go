@@ -108,7 +108,7 @@ func (r *TokenRepository) UpdateToken(ctx context.Context, tokenID string, token
 
 func (r *TokenRepository) GetTokenByVerifier(ctx context.Context, verifier string) (*entity.Token, error) {
 	filter := bson.M{"verifier": verifier}
-	var dto *tokenDTO
+	var dto tokenDTO
 
 	err := r.Collection.FindOne(ctx, filter).Decode(&dto)
 	if err != nil {
