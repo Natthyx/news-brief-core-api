@@ -122,13 +122,28 @@ func (h *AuthHandler) HandleGoogleCallback(ctx *gin.Context) {
 		return
 	}
 
-	if h.FrontendBaseURL != "" {
-		u, _ := url.Parse(h.FrontendBaseURL)
+	platform := ctx.Query("platform")
+	if platform == "mobile" {
+		ctx.JSON(http.StatusOK, gin.H{
+			"message":       "login successful",
+			"access_token":  accessToken,
+			"refresh_token": refershToken,
+		})
+		return
+	}
+
+	if h.FrontendBaseURL != "" || os.Getenv("FRONTEND_MOBILE_BASE_URL") != "" {
+		redirectBase := h.FrontendBaseURL
+		if platform == "mobile" {
+			if mb := os.Getenv("FRONTEND_MOBILE_BASE_URL"); mb != "" {
+				redirectBase = mb
+			}
+		}
+		u, _ := url.Parse(redirectBase)
 		u.Path = "/auth/verified"
 		fragment := url.Values{}
 		fragment.Set("access_token", accessToken)
 		fragment.Set("refresh_token", refershToken)
-		// try to get user id from access token claims
 		if claims, err := h.jwtService.ParseAccessToken(accessToken); err == nil {
 			fragment.Set("user_id", claims.UserID)
 		}

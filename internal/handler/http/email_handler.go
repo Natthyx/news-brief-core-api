@@ -117,10 +117,26 @@ func (h *EmailHandler) HandleVerifyEmailToken(ctx *gin.Context) {
 
 	// success response with tokens
 	frontend := h.config.GetFrontendBaseURL()
-	if frontend != "" {
-		// Redirect to frontend with tokens in fragment to avoid server logs and referer leaks
-		u, _ := url.Parse(frontend)
-		# build a redirect URL like: FRONTEND_BASE_URL/auth/verified#access_token=...&refresh_token=...
+	mobile := h.config.GetFrontendMobileBaseURL()
+	platform := ctx.Query("platform") // optional hint: "mobile" or "web"
+
+	// Force JSON for mobile platform
+	if platform == "mobile" {
+		ctx.JSON(http.StatusOK, gin.H{
+			"message":       "Email verified successfully",
+			"user":          user,
+			"access_token":  accessToken,
+			"refresh_token": refreshToken,
+		})
+		return
+	}
+
+	redirectBase := frontend
+	if platform == "mobile" && mobile != "" {
+		redirectBase = mobile
+	}
+	if redirectBase != "" {
+		u, _ := url.Parse(redirectBase)
 		u.Path = "/auth/verified"
 		fragment := url.Values{}
 		fragment.Set("access_token", accessToken)
@@ -137,5 +153,4 @@ func (h *EmailHandler) HandleVerifyEmailToken(ctx *gin.Context) {
 		"access_token":  accessToken,
 		"refresh_token": refreshToken,
 	})
-	// Optionally redirect with tokens if desired; keeping JSON for API clients
 }
