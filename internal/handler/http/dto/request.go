@@ -2,10 +2,9 @@ package dto
 
 // CreateUserRequest is the DTO for creating a new user.
 type CreateUserRequest struct {
-	Username string `json:"username" binding:"required,min=3,max=32"`
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=8,max=32,containsuppercase,containslowercase,containsdigit,containssymbol"`
-	Fullname string `json:"fullname" binding:"required,min=3,max=50"`
+	FullName   string `json:"full_name" binding:"required,min=3,max=100"`
+	Email      string `json:"email" binding:"required,email"`
+	Password   string `json:"password" binding:"required,min=8,max=32,containsuppercase,containslowercase,containsdigit,containssymbol"`
 }
 
 // LoginRequest is the DTO for user login.
@@ -14,18 +13,14 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
-// RegisterRequest is the DTO for user registration.
-type RegisterRequest struct {
-	Username string `json:"username" binding:"required,min=3,max=32"`
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=8,max=32"`
-	Fullname string `json:"fullname" binding:"required,min=3,max=50"`
-}
+// RegisterRequest is deprecated; use CreateUserRequest
 
 // UpdateUserRequest is the DTO for updating user profile.
 type UpdateUserRequest struct {
 	Username  *string `json:"username,omitempty" binding:"omitempty,min=3,max=32"`
-	Fullname  *string `json:"fullname,omitempty" binding:"omitempty,max=50"`
+	FirstName *string `json:"firstname,omitempty" binding:"omitempty,max=50"`
+	LastName  *string `json:"lastname,omitempty" binding:"omitempty,max=50"`
+	AvatarURL *string `json:"avatar_url,omitempty" binding:"omitempty,url"`
 }
 
 // ForgotPasswordRequest is the DTO for requesting password reset.
@@ -53,31 +48,4 @@ type ResendVerificationRequest struct {
 // RefreshTokenRequest is the DTO for refreshing access tokens.
 type RefreshTokenRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
-}
-
-type AddSubscriptionRequest struct {
-	SourceKey string `json:"source_key" binding:"required"`
-}
-
-type ReplaceTopicsRequest struct {
-	Topics []string `json:"topics" binding:"required,dive,min=1"`
-}
-
-type UpdateTopicsRequest struct {
-	Action string   `json:"action" binding:"required,oneof=add remove"`
-	Topics []string `json:"topics" binding:"required,dive,min=1"`
-}
-
-// NotificationsRequestDTO defines the nested notifications object for preference updates.
-type NotificationsRequestDTO struct {
-	DailyBrief   *bool `json:"daily_brief"`
-	BreakingNews *bool `json:"breaking_news"`
-}
-
-// UpdatePreferencesRequest defines the body for the PATCH /v1/me/preferences endpoint.
-type UpdatePreferencesRequest struct {
-	Lang          *string                  `json:"lang"`
-	BriefType     *string                  `json:"brief_type"`
-	DataSaver     *bool                    `json:"data_saver"`
-	Notifications *NotificationsRequestDTO `json:"notifications,omitempty"`
 }

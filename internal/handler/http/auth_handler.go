@@ -5,12 +5,14 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"os"
+	"strings"
+
 	"github.com/RealEskalate/G6-NewsBrief/internal/domain/contract"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	"net/http"
-	"os"
 )
 
 type AuthHandler struct {
@@ -44,7 +46,7 @@ func (h *AuthHandler) HandleGoogleLogin(ctx *gin.Context) {
 	b := make([]byte, 16)
 	rand.Read(b)
 	oauthStateString := base64.URLEncoding.EncodeToString(b)
-	ctx.SetCookie("oauthState", oauthStateString, 300, "/", "", false, true)
+	ctx.SetCookie("oauthState", oauthStateString, 300, "/", "localhost", false, true)
 
 	url := h.googleOauthConfig().AuthCodeURL(oauthStateString)
 	ctx.Redirect(http.StatusTemporaryRedirect, url)
@@ -58,8 +60,7 @@ func (h *AuthHandler) HandleGoogleCallback(ctx *gin.Context) {
 		ctx.String(http.StatusUnauthorized, "invalid CSRF state token\n")
 		return
 	}
-	cookieSecure := os.Getenv("OAUTH2_SET_COOKIE_SECURE")
-	ctx.SetCookie("oauthState", "", -1, "/", "", cookieSecure == "true", true)
+	ctx.SetCookie("oauthState", "", -1, "/", "localhost", false, true)
 
 	code := ctx.Query("code")
 	if code == "" {
@@ -90,9 +91,16 @@ func (h *AuthHandler) HandleGoogleCallback(ctx *gin.Context) {
 		ctx.String(http.StatusInternalServerError, fmt.Sprintf("Failed to decode user info: %v\n", err))
 	}
 
-	fullname := userInfo.Name
+	nameParts := strings.Split(userInfo.Name, " ")
+	var fName, lName string
+	if len(nameParts) >= 1 {
+		fName = nameParts[0]
+	}
+	if len(nameParts) == 2 {
+		lName = nameParts[1]
+	}
 
-	accessToken, refreshToken, err := h.UserUseCase.LoginWithOAuth(requestCtx, fullname, userInfo.Email)
+	accessToken, refershToken, err := h.UserUseCase.LoginWithOAuth(requestCtx, fName, lName, userInfo.Email)
 
 	if err != nil {
 		ctx.String(http.StatusInternalServerError, fmt.Sprintf("failed to login with OAuth: %v\n", err))
@@ -102,6 +110,6 @@ func (h *AuthHandler) HandleGoogleCallback(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{
 		"message":       "login successful",
 		"access token":  accessToken,
-		"refresh token": refreshToken,
+		"refresh token": refershToken,
 	})
 }
