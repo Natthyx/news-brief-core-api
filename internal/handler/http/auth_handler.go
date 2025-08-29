@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
@@ -28,8 +29,8 @@ func NewAuthHandler(uc contract.IUserUseCase, baseURL string) *AuthHandler {
 }
 
 type UserInfo struct {
-	Email string
-	Name  string
+	Email string `json:"email"`
+	Name  string `json:"name"`
 }
 
 func (h *AuthHandler) googleOauthConfig() *oauth2.Config {
@@ -37,16 +38,26 @@ func (h *AuthHandler) googleOauthConfig() *oauth2.Config {
 		ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
 		ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
 		RedirectURL:  h.BaseURL + "/api/v1/auth/google/callback",
-		Scopes:       []string{"email", "profile"},
+		Scopes:       []string{"openid", "email", "profile"},
 		Endpoint:     google.Endpoint,
 	}
 }
 
+func (h *AuthHandler) cookieParams() (domain string, secure bool) {
+	u, err := url.Parse(h.BaseURL)
+	if err != nil {
+		return "", false
+	}
+	secure = u.Scheme == "https"
+	return u.Hostname(), secure
+}
+
 func (h *AuthHandler) HandleGoogleLogin(ctx *gin.Context) {
 	b := make([]byte, 16)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 	oauthStateString := base64.URLEncoding.EncodeToString(b)
-	ctx.SetCookie("oauthState", oauthStateString, 300, "/", "localhost", false, true)
+	domain, secure := h.cookieParams()
+	ctx.SetCookie("oauthState", oauthStateString, 300, "/", domain, secure, true)
 
 	url := h.googleOauthConfig().AuthCodeURL(oauthStateString)
 	ctx.Redirect(http.StatusTemporaryRedirect, url)
@@ -60,7 +71,9 @@ func (h *AuthHandler) HandleGoogleCallback(ctx *gin.Context) {
 		ctx.String(http.StatusUnauthorized, "invalid CSRF state token\n")
 		return
 	}
-	ctx.SetCookie("oauthState", "", -1, "/", "localhost", false, true)
+	// clear cookie
+	domain, secure := h.cookieParams()
+	ctx.SetCookie("oauthState", "", -1, "/", domain, secure, true)
 
 	code := ctx.Query("code")
 	if code == "" {
@@ -72,36 +85,34 @@ func (h *AuthHandler) HandleGoogleCallback(ctx *gin.Context) {
 
 	token, err := h.googleOauthConfig().Exchange(requestCtx, code)
 	if err != nil {
-		ctx.String(http.StatusInternalServerError, fmt.Sprintf("failed to exchange autherization for token: %v\n", err))
+		ctx.String(http.StatusInternalServerError, fmt.Sprintf("failed to exchange authorization for token: %v\n", err))
 		return
 	}
 
 	client := h.googleOauthConfig().Client(requestCtx, token)
-	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
+	resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
 	if err != nil {
 		ctx.String(http.StatusInternalServerError, fmt.Sprintf("Failed to get user info: %v", err))
 		return
 	}
-
 	defer resp.Body.Close()
 
 	var userInfo UserInfo
-
 	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
 		ctx.String(http.StatusInternalServerError, fmt.Sprintf("Failed to decode user info: %v\n", err))
+		return
 	}
 
-	nameParts := strings.Split(userInfo.Name, " ")
+	nameParts := strings.Fields(userInfo.Name)
 	var fName, lName string
 	if len(nameParts) >= 1 {
 		fName = nameParts[0]
 	}
-	if len(nameParts) == 2 {
-		lName = nameParts[1]
+	if len(nameParts) >= 2 {
+		lName = nameParts[len(nameParts)-1]
 	}
 
 	accessToken, refershToken, err := h.UserUseCase.LoginWithOAuth(requestCtx, fName, lName, userInfo.Email)
-
 	if err != nil {
 		ctx.String(http.StatusInternalServerError, fmt.Sprintf("failed to login with OAuth: %v\n", err))
 		return
