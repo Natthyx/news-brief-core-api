@@ -3,6 +3,7 @@ package http
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/RealEskalate/G6-NewsBrief/internal/domain/contract"
 	"github.com/RealEskalate/G6-NewsBrief/internal/handler/http/dto"
@@ -42,7 +43,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 		return
 	}
 
-	_, err := h.userUsecase.Register(c.Request.Context(), req.Username, req.Email, req.Password, req.FirstName, req.LastName)
+	_, err := h.userUsecase.Register(c.Request.Context(), req.Username, req.Email, req.Password, req.Fullname)
 	if err != nil {
 		ErrorHandler(c, http.StatusConflict, err.Error())
 		return
@@ -219,15 +220,36 @@ func updateUserRequestToMap(req dto.UpdateUserRequest) map[string]interface{} {
 	if req.Username != nil {
 		updates["username"] = *req.Username
 	}
-	if req.FirstName != nil {
-		updates["firstname"] = *req.FirstName
+	if req.Fullname != nil {
+		updates["fullname"] = *req.Fullname
 	}
-	if req.LastName != nil {
-		updates["lastname"] = *req.LastName
-	}
-	if req.AvatarURL != nil {
-		updates["avatarURL"] = *req.AvatarURL
+	return updates
+}
+
+// UpdatePreferences handles PATCH /v1/me/preferences
+func (h *UserHandler) UpdatePreferences(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		ErrorHandler(c, http.StatusUnauthorized, "User not authenticated")
+		return
 	}
 
-	return updates
+	var req dto.UpdatePreferencesRequest
+	// Use ShouldBindJSON for partial updates, as `binding:"required"` won't work well.
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorHandler(c, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	updatedPrefs, err := h.userUsecase.UpdatePreferences(c.Request.Context(), userID.(string), req)
+	if err != nil {
+		ErrorHandler(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	response := gin.H{
+		"preferences": updatedPrefs, // Assuming DTO for preferences exists
+		"updated_at":  time.Now(),
+	}
+	SuccessHandler(c, http.StatusOK, response)
 }
