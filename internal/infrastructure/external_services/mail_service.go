@@ -1,117 +1,103 @@
 package external_services
 
 import (
+	"bytes"
 	"context"
-	"crypto/tls"
+	"encoding/json"
 	"fmt"
-	"net"
-	"net/smtp"
-	"strings"
+	"net/http"
+	"time"
 
 	"github.com/RealEskalate/G6-NewsBrief/internal/domain/contract"
 )
 
-// smtp attribute
+// EmailService implements sending emails via SendGrid API
+// API docs: https://docs.sendgrid.com/api-reference/mail-send/mail-send
+// Minimal plain-text implementation.
 type EmailService struct {
-	Host        string
-	Port        string
-	Username    string
-	AppPassword string
-	From        string
+	APIKey   string
+	From     string
+	FromName string
+	client   *http.Client
 }
 
-// EmailService factory
-func NewEmailService(host, port, username, appPassword, from string) *EmailService {
+// NewEmailService creates a SendGrid email service client.
+func NewEmailService(apiKey, from, fromName string) *EmailService {
 	return &EmailService{
-		Host:        host,
-		Port:        port,
-		Username:    username,
-		AppPassword: appPassword,
-		From:        from,
+		APIKey:   apiKey,
+		From:     from,
+		FromName: fromName,
+		client: &http.Client{
+			Timeout: 15 * time.Second,
+		},
 	}
 }
 
-// make sure EmailService implements contract.IEmailService.go
 var _ contract.IEmailService = (*EmailService)(nil)
 
-// send email method
+// sendgridRequest models the JSON payload for SendGrid mail send
+type sendgridRequest struct {
+	Personalizations []struct {
+		To      []struct{ Email string `json:"email"` } `json:"to"`
+		Subject string                               `json:"subject"`
+	} `json:"personalizations"`
+	From struct {
+		Email string `json:"email"`
+		Name  string `json:"name,omitempty"`
+	} `json:"from"`
+	Content []struct {
+		Type  string `json:"type"`
+		Value string `json:"value"`
+	} `json:"content"`
+}
+
 func (es *EmailService) SendEmail(ctx context.Context, to, subject, body string) error {
-	fromAddr := es.From
-	if strings.TrimSpace(fromAddr) == "" {
-		fromAddr = es.Username
+	if es.APIKey == "" {
+		return fmt.Errorf("sendgrid api key is not configured")
 	}
-	if strings.TrimSpace(fromAddr) == "" {
-		return fmt.Errorf("email sender not configured: From/Username is empty")
+	if es.From == "" {
+		return fmt.Errorf("email from address is not configured")
 	}
 
-	// Build message with minimal MIME headers for inbox placement
-	msg := []byte(
-		fmt.Sprintf(
-			"From: %s\r\n"+
-				"To: %s\r\n"+
-				"Subject: %s\r\n"+
-				"MIME-Version: 1.0\r\n"+
-				"Content-Type: text/plain; charset=\"UTF-8\"\r\n"+
-				"\r\n"+
-				"%s\r\n",
-			fromAddr, to, subject, body,
-		),
-	)
+	payload := sendgridRequest{}
+	p := struct {
+		To      []struct{ Email string `json:"email"` } `json:"to"`
+		Subject string                               `json:"subject"`
+	}{}
+	p.To = []struct{ Email string `json:"email"` }{{Email: to}}
+	p.Subject = subject
+	payload.Personalizations = []struct {
+		To      []struct{ Email string `json:"email"` } `json:"to"`
+		Subject string                               `json:"subject"`
+	}{p}
+	payload.From.Email = es.From
+	payload.From.Name = es.FromName
+	payload.Content = []struct {
+		Type  string `json:"type"`
+		Value string `json:"value"`
+	}{{Type: "text/plain", Value: body}}
 
-	addr := net.JoinHostPort(es.Host, es.Port)
-
-	// Establish connection
-	conn, err := net.Dial("tcp", addr)
+	buf, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("smtp dial failed to %s: %w", addr, err)
+		return fmt.Errorf("failed to marshal sendgrid payload: %w", err)
 	}
-	defer conn.Close()
 
-	c, err := smtp.NewClient(conn, es.Host)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.sendgrid.com/v3/mail/send", bytes.NewReader(buf))
 	if err != nil {
-		return fmt.Errorf("smtp new client failed: %w", err)
+		return fmt.Errorf("failed to create sendgrid request: %w", err)
 	}
-	defer c.Quit()
+	req.Header.Set("Authorization", "Bearer "+es.APIKey)
+	req.Header.Set("Content-Type", "application/json")
 
-	// Upgrade to TLS if supported
-	if ok, _ := c.Extension("STARTTLS"); ok {
-		config := &tls.Config{ServerName: es.Host}
-		if err = c.StartTLS(config); err != nil {
-			return fmt.Errorf("smtp STARTTLS failed: %w", err)
-		}
-	}
-
-	// Authenticate if server supports it and creds provided
-	if es.Username != "" && es.AppPassword != "" {
-		if ok, _ := c.Extension("AUTH"); ok {
-			auth := smtp.PlainAuth("", es.Username, es.AppPassword, es.Host)
-			if err = c.Auth(auth); err != nil {
-				return fmt.Errorf("smtp auth failed: %w", err)
-			}
-		}
-	}
-
-	// Set the sender and recipient
-	if err = c.Mail(fromAddr); err != nil {
-		return fmt.Errorf("smtp MAIL FROM failed: %w", err)
-	}
-	if err = c.Rcpt(to); err != nil {
-		return fmt.Errorf("smtp RCPT TO failed for %s: %w", to, err)
-	}
-
-	// Send the email body
-	wc, err := c.Data()
+	resp, err := es.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("smtp DATA start failed: %w", err)
+		return fmt.Errorf("sendgrid request failed: %w", err)
 	}
-	_, werr := wc.Write(msg)
-	cerr := wc.Close()
-	if werr != nil {
-		return fmt.Errorf("smtp write failed: %w", werr)
-	}
-	if cerr != nil {
-		return fmt.Errorf("smtp close failed: %w", cerr)
-	}
+	defer resp.Body.Close()
 
+	// SendGrid returns 202 Accepted on success
+	if resp.StatusCode != http.StatusAccepted {
+		return fmt.Errorf("sendgrid mail send failed: status=%d", resp.StatusCode)
+	}
 	return nil
 }
