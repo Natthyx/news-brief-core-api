@@ -25,7 +25,7 @@ func NewRouter(userUsecase contract.IUserUseCase, emailVerUC contract.IEmailVeri
 	return &Router{
 		userHandler: NewUserHandler(userUsecase),
 
-		emailHandler: NewEmailHandler(emailVerUC, userRepo),
+		emailHandler: NewEmailHandler(emailVerUC, userRepo, jwtService, tokenRepo, hasher, config, uuidGen),
 		userUsecase:  usecase.NewUserUsecase(userRepo, tokenRepo, emailVerUC, hasher, jwtService, mailService, logger, config, validator, uuidGen, randomGen),
 		jwtService:   jwtService,
 		authHandler:  NewAuthHandler(userUsecase, baseURL),

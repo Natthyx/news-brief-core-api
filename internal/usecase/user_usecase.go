@@ -551,7 +551,7 @@ func (uc *UserUsecase) LoginWithOAuth(ctx context.Context, firstName, lastName, 
 		return "", "", errors.New(errInternalServer)
 	}
 
-	// If user does not exist, create a new one
+	// If user does not exist, create a new one (unverified)
 	if user == nil {
 		// Create a new user entity
 		var pFirstName *string
@@ -585,7 +585,17 @@ func (uc *UserUsecase) LoginWithOAuth(ctx context.Context, firstName, lastName, 
 		user = newUser
 	}
 
-	// At this point, we have a user (either existing or newly created)
+	// Require email verification for OAuth sign-in as well
+	if !user.IsVerified {
+		// Auto-verify Google users
+		user.IsVerified = true
+		if _, err := uc.userRepo.UpdateUser(ctx, user); err != nil {
+			uc.logger.Errorf("failed to mark oauth user verified: %v", err)
+			return "", "", errors.New("failed to verify oauth user")
+		}
+	}
+
+	// At this point, we have a verified user
 	// Generate access and refresh tokens
 	accessToken, err := uc.jwtService.GenerateAccessToken(user.ID, user.Role)
 	if err != nil {
