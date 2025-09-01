@@ -12,8 +12,7 @@ type UserResponse struct {
 	Username  string  `json:"username"`
 	Email     string  `json:"email"`
 	Role      string  `json:"role"`
-	FirstName *string `json:"first_name"`
-	LastName  *string `json:"last_name"`
+	FullName  *string `json:"fullname"`
 	AvatarURL *string `json:"avatar_url"`
 	IsVerified bool   `json:"is_verified"`
 	CreatedAt string  `json:"created_at"`
@@ -33,8 +32,7 @@ func ToUserResponse(user entity.User) UserResponse {
 		Username:  user.Username,
 		Email:     user.Email,
 		Role:      string(user.Role),
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
+		FullName:  user.FullName,
 		AvatarURL: user.AvatarURL,
 		IsVerified: user.IsVerified,
 		CreatedAt: user.CreatedAt.Format(time.RFC3339),

@@ -236,11 +236,8 @@ func updateUserRequestToMap(req dto.UpdateUserRequest) map[string]interface{} {
 	if req.Username != nil {
 		updates["username"] = *req.Username
 	}
-	if req.FirstName != nil {
-		updates["firstname"] = *req.FirstName
-	}
-	if req.LastName != nil {
-		updates["lastname"] = *req.LastName
+	if req.FullName != nil {
+		updates["fullname"] = *req.FullName
 	}
 	if req.AvatarURL != nil {
 		updates["avatarURL"] = *req.AvatarURL

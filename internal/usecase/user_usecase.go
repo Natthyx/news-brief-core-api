@@ -92,12 +92,11 @@ func (uc *UserUsecase) Register(ctx context.Context, fullName, email, password s
 		return nil, fmt.Errorf("failed to process password")
 	}
 
-	// Map fullName into firstName for MVP (store entire full name in first name field)
-	var pFirstName *string
-	var pLastName *string
+	// Store fullName in the FullName field
+	var pFullName *string
 	if fullName != "" {
 		fn := fullName
-		pFirstName = &fn
+		pFullName = &fn
 	}
 
 	// Create new user entity
@@ -111,8 +110,7 @@ func (uc *UserUsecase) Register(ctx context.Context, fullName, email, password s
 		AvatarURL:    nil,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
-		FirstName:    pFirstName,
-		LastName:     pLastName,
+		FullName:     pFullName,
 	}
 
 	// Save user to database
@@ -509,15 +507,11 @@ func (uc *UserUsecase) UpdateProfile(ctx context.Context, userID string, updates
 			if username, ok := v.(string); ok {
 				user.Username = username
 			}
-		case "first_name":
-			if firstName, ok := v.(string); ok {
-				user.FirstName = &firstName
+		case "fullname":
+			if fullName, ok := v.(string); ok {
+				user.FullName = &fullName
 			}
-		case "last_name":
-			if lastName, ok := v.(string); ok {
-				user.LastName = &lastName
-			}
-		case "avatar_url":
+		case "avatarURL":
 			if avatarURL, ok := v.(string); ok {
 				user.AvatarURL = &avatarURL
 			}
@@ -554,13 +548,10 @@ func (uc *UserUsecase) LoginWithOAuth(ctx context.Context, firstName, lastName, 
 	// If user does not exist, create a new one (unverified)
 	if user == nil {
 		// Create a new user entity
-		var pFirstName *string
-		if firstName != "" {
-			pFirstName = &firstName
-		}
-		var pLastName *string
-		if lastName != "" {
-			pLastName = &lastName
+		var pFullName *string
+		fullName := firstName + " " + lastName
+		if fullName != " " {
+			pFullName = &fullName
 		}
 
 		newUser := &entity.User{
@@ -573,8 +564,7 @@ func (uc *UserUsecase) LoginWithOAuth(ctx context.Context, firstName, lastName, 
 			AvatarURL:    nil,
 			CreatedAt:    time.Now(),
 			UpdatedAt:    time.Now(),
-			FirstName:    pFirstName,
-			LastName:     pLastName,
+			FullName:     pFullName,
 		}
 
 		// Save the new user to the database

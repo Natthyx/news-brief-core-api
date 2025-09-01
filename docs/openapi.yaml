@@ -281,9 +281,7 @@ paths:
               properties:
                 username:
                   type: string
-                firstname:
-                  type: string
-                lastname:
+                fullname:
                   type: string
                 avatar_url:
                   type: string
@@ -313,10 +311,7 @@ components:
           format: email
         role:
           type: string
-        first_name:
-          type: string
-          nullable: true
-        last_name:
+        fullname:
           type: string
           nullable: true
         avatar_url:

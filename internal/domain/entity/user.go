@@ -14,8 +14,7 @@ type User struct {
 	IsVerified   bool      `bson:"is_verified" json:"is_verified"`
 	CreatedAt    time.Time `bson:"created_at" json:"created_at"`
 	UpdatedAt    time.Time `bson:"updated_at" json:"updated_at"`
-	FirstName    *string   `bson:"firstname,omitempty" json:"firstname,omitempty"`
-	LastName     *string   `bson:"lastname,omitempty" json:"lastname,omitempty"`
+	FullName     *string   `bson:"fullname,omitempty" json:"fullname,omitempty"`
 	AvatarURL    *string   `bson:"avatar_url,omitempty" json:"avatar_url,omitempty"`
 }
 

@@ -18,8 +18,7 @@ type LoginRequest struct {
 // UpdateUserRequest is the DTO for updating user profile.
 type UpdateUserRequest struct {
 	Username  *string `json:"username,omitempty" binding:"omitempty,min=3,max=32"`
-	FirstName *string `json:"firstname,omitempty" binding:"omitempty,max=50"`
-	LastName  *string `json:"lastname,omitempty" binding:"omitempty,max=50"`
+	FullName  *string `json:"fullname,omitempty" binding:"omitempty,max=100"`
 	AvatarURL *string `json:"avatar_url,omitempty" binding:"omitempty,url"`
 }
 
