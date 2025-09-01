@@ -330,9 +330,14 @@ func (uc *UserUsecase) ForgotPassword(ctx context.Context, email string) error {
 		return errors.New("failed to initiate password reset")
 	}
 
-	// The reset link should use the unhashed token
+	// The reset link should use the frontend URL directly
 	emailSubject := "Password Reset Request"
-	resetLink := fmt.Sprintf("%s/reset-password?verifier=%s&token=%s", uc.config.GetAppBaseURL(), verifier, resetToken)
+	frontendURL := uc.config.GetFrontendBaseURL()
+	if frontendURL == "" {
+		uc.logger.Errorf("Frontend URL not configured for password reset email")
+		return errors.New("frontend URL not configured")
+	}
+	resetLink := fmt.Sprintf("%s/reset-password?verifier=%s&token=%s", frontendURL, verifier, resetToken)
 	emailBody := fmt.Sprintf("Hi %s,\n\nYou have requested to reset your password. Please click the following link to reset your password: %s\n\nIf you did not request this, please ignore this email.\n\nThanks,\nThe Team", user.Username, resetLink)
 
 	if err := uc.mailService.SendEmail(ctx, user.Email, emailSubject, emailBody); err != nil {

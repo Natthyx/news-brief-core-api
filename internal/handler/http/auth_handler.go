@@ -132,10 +132,10 @@ func (h *AuthHandler) HandleGoogleCallback(ctx *gin.Context) {
 		return
 	}
 
-	if h.FrontendBaseURL != "" || os.Getenv("FRONTEND_MOBILE_BASE_URL") != "" {
+	if h.FrontendBaseURL != "" || os.Getenv("FRONTEND_BASE_URL") != "" {
 		redirectBase := h.FrontendBaseURL
 		if platform == "mobile" {
-			if mb := os.Getenv("FRONTEND_MOBILE_BASE_URL"); mb != "" {
+			if mb := os.Getenv("FRONTEND_BASE_URL"); mb != "" {
 				redirectBase = mb
 			}
 		}
