@@ -18,6 +18,6 @@ type IUserUseCase interface {
 	PromoteUser(ctx context.Context, userID string) (*entity.User, error)
 	DemoteUser(ctx context.Context, userID string) (*entity.User, error)
 	UpdateProfile(ctx context.Context, userID string, updates map[string]interface{}) (*entity.User, error)
-	LoginWithOAuth(ctx context.Context, firstName, lastName, email string) (string, string, error)
+	LoginWithOAuth(ctx context.Context, fullName, email string) (string, string, error)
 	GetUserByID(ctx context.Context, userID string) (*entity.User, error)
 }
