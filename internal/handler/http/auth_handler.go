@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 
 	"github.com/RealEskalate/G6-NewsBrief/internal/domain/contract"
 	"github.com/gin-gonic/gin"
