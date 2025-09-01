@@ -73,10 +73,8 @@ func main() {
 	appValidator := validator.NewValidator()
 	uuidGenerator := uuidgen.NewGenerator()
 	appConfig := config.NewConfig()
-	// config
-	baseURL := appConfig.GetAppBaseURL()
 	// Dependency Injection: Usecases
-	emailUsecase := usecase.NewEmailVerificationUseCase(tokenRepo, userRepo, mailService, randomGenerator, uuidGenerator, baseURL)
+	emailUsecase := usecase.NewEmailVerificationUseCase(tokenRepo, userRepo, mailService, randomGenerator, uuidGenerator, appConfig)
 	userUsecase := usecase.NewUserUsecase(userRepo, tokenRepo, emailUsecase, hasher, jwtService, mailService, appLogger, appConfig, appValidator, uuidGenerator, randomGenerator)
 
 	// Pass Prometheus metrics to handlers or usecases as needed (import from metrics package)

@@ -19,15 +19,15 @@ import (
 type AuthHandler struct {
 	UserUseCase      contract.IUserUseCase
 	BaseURL          string
-	FrontendBaseURL  string
+	config           contract.IConfigProvider
 	jwtService       contract.IJWTService
 }
 
-func NewAuthHandler(uc contract.IUserUseCase, baseURL string, frontendBaseURL string, jwtSvc contract.IJWTService) *AuthHandler {
+func NewAuthHandler(uc contract.IUserUseCase, baseURL string, config contract.IConfigProvider, jwtSvc contract.IJWTService) *AuthHandler {
 	return &AuthHandler{
 		UserUseCase:     uc,
 		BaseURL:         baseURL,
-		FrontendBaseURL: frontendBaseURL,
+		config:          config,
 		jwtService:      jwtSvc,
 	}
 }
@@ -57,14 +57,20 @@ func (h *AuthHandler) cookieParams() (domain string, secure bool) {
 }
 
 func (h *AuthHandler) HandleGoogleLogin(ctx *gin.Context) {
+	// Generate OAuth state with platform information
 	b := make([]byte, 16)
 	_, _ = rand.Read(b)
 	oauthStateString := base64.URLEncoding.EncodeToString(b)
+	
+	// Store platform in cookie for later use
+	platform := ctx.Query("platform")
 	domain, secure := h.cookieParams()
 	ctx.SetCookie("oauthState", oauthStateString, 300, "/", domain, secure, true)
+	ctx.SetCookie("oauthPlatform", platform, 300, "/", domain, secure, true)
 
-	url := h.googleOauthConfig().AuthCodeURL(oauthStateString)
-	ctx.Redirect(http.StatusTemporaryRedirect, url)
+	// Generate Google OAuth URL
+	authURL := h.googleOauthConfig().AuthCodeURL(oauthStateString)
+	ctx.Redirect(http.StatusTemporaryRedirect, authURL)
 }
 
 func (h *AuthHandler) HandleGoogleCallback(ctx *gin.Context) {
@@ -75,9 +81,14 @@ func (h *AuthHandler) HandleGoogleCallback(ctx *gin.Context) {
 		ctx.String(http.StatusUnauthorized, "invalid CSRF state token\n")
 		return
 	}
-	// clear cookie
+	
+	// Get platform from cookie
+	platform, _ := ctx.Cookie("oauthPlatform")
+	
+	// Clear cookies
 	domain, secure := h.cookieParams()
 	ctx.SetCookie("oauthState", "", -1, "/", domain, secure, true)
+	ctx.SetCookie("oauthPlatform", "", -1, "/", domain, secure, true)
 
 	code := ctx.Query("code")
 	if code == "" {
@@ -107,54 +118,68 @@ func (h *AuthHandler) HandleGoogleCallback(ctx *gin.Context) {
 		return
 	}
 
-	nameParts := strings.Fields(userInfo.Name)
-	var fName, lName string
-	if len(nameParts) >= 1 {
-		fName = nameParts[0]
-	}
-	if len(nameParts) >= 2 {
-		lName = nameParts[len(nameParts)-1]
+	// Use the full name directly instead of splitting
+	fullName := userInfo.Name
+	if fullName == "" {
+		fullName = userInfo.Email // Fallback to email if name is empty
 	}
 
-	accessToken, refershToken, err := h.UserUseCase.LoginWithOAuth(requestCtx, fName, lName, userInfo.Email)
+	accessToken, refreshToken, err := h.UserUseCase.LoginWithOAuth(requestCtx, fullName, userInfo.Email)
 	if err != nil {
 		ctx.String(http.StatusInternalServerError, fmt.Sprintf("failed to login with OAuth: %v\n", err))
 		return
 	}
 
-	platform := ctx.Query("platform")
+	// Platform is already retrieved from cookie above
+	
+	// Handle mobile app flow
 	if platform == "mobile" {
+		// For mobile, return JSON response with tokens
 		ctx.JSON(http.StatusOK, gin.H{
 			"message":       "login successful",
 			"access_token":  accessToken,
-			"refresh_token": refershToken,
+			"refresh_token": refreshToken,
+			"platform":      "mobile",
 		})
 		return
 	}
 
-	if h.FrontendBaseURL != "" || os.Getenv("FRONTEND_BASE_URL") != "" {
-		redirectBase := h.FrontendBaseURL
-		if platform == "mobile" {
-			if mb := os.Getenv("FRONTEND_BASE_URL"); mb != "" {
-				redirectBase = mb
-			}
+	// Handle web flow - redirect to frontend
+	frontendURL := h.config.GetFrontendBaseURL()
+	
+	if frontendURL != "" {
+		// Parse frontend URL and add tokens as query parameters
+		u, err := url.Parse(frontendURL)
+		if err != nil {
+			ctx.String(http.StatusInternalServerError, "Invalid frontend URL configuration")
+			return
 		}
-		u, _ := url.Parse(redirectBase)
-		u.Path = "/auth/verified"
-		fragment := url.Values{}
-		fragment.Set("access_token", accessToken)
-		fragment.Set("refresh_token", refershToken)
+		
+		// Set the path to the auth success page
+		u.Path = "/auth/success"
+		
+		// Add tokens as query parameters (more secure than fragments)
+		query := u.Query()
+		query.Set("access_token", accessToken)
+		query.Set("refresh_token", refreshToken)
+		
+		// Add user ID if we can parse the token
 		if claims, err := h.jwtService.ParseAccessToken(accessToken); err == nil {
-			fragment.Set("user_id", claims.UserID)
+			query.Set("user_id", claims.UserID)
 		}
-		u.Fragment = fragment.Encode()
+		
+		u.RawQuery = query.Encode()
+		
+		// Redirect to frontend with tokens
 		ctx.Redirect(http.StatusFound, u.String())
 		return
 	}
 
+	// Fallback: return JSON if no frontend URL is configured
 	ctx.JSON(http.StatusOK, gin.H{
 		"message":       "login successful",
-		"access token":  accessToken,
-		"refresh token": refershToken,
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
+		"platform":      "web",
 	})
 }

@@ -542,7 +542,7 @@ func (uc *UserUsecase) UpdateProfile(ctx context.Context, userID string, updates
 }
 
 // login with OAuth2
-func (uc *UserUsecase) LoginWithOAuth(ctx context.Context, firstName, lastName, email string) (string, string, error) {
+func (uc *UserUsecase) LoginWithOAuth(ctx context.Context, fullName, email string) (string, string, error) {
 	// Check if user with the given email already exists
 	user, err := uc.userRepo.GetUserByEmail(ctx, email)
 	if err != nil && err.Error() != errUserNotFound {
@@ -550,22 +550,21 @@ func (uc *UserUsecase) LoginWithOAuth(ctx context.Context, firstName, lastName, 
 		return "", "", errors.New(errInternalServer)
 	}
 
-	// If user does not exist, create a new one (unverified)
+	// If user does not exist, create a new one (auto-verified for OAuth)
 	if user == nil {
 		// Create a new user entity
 		var pFullName *string
-		fullName := firstName + " " + lastName
-		if fullName != " " {
+		if fullName != "" {
 			pFullName = &fullName
 		}
 
 		newUser := &entity.User{
 			ID:           uc.uuidGenerator.NewUUID(),
-			Username:     email, // Or generate a unique username
+			Username:     email, // Use email as username for OAuth users
 			Email:        email,
 			PasswordHash: "", // No password for OAuth users
 			Role:         entity.UserRoleUser,
-			IsVerified:   true,
+			IsVerified:   true, // Auto-verify OAuth users
 			AvatarURL:    nil,
 			CreatedAt:    time.Now(),
 			UpdatedAt:    time.Now(),
