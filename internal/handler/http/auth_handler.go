@@ -36,10 +36,32 @@ type UserInfo struct {
 	Name  string `json:"name"`
 }
 
-func (h *AuthHandler) googleOauthConfig() *oauth2.Config {
+// googleOauthConfig returns an oauth2.Config using separate client IDs per platform
+func (h *AuthHandler) googleOauthConfig(platform string) *oauth2.Config {
+	// Prefer dedicated client IDs per platform when provided
+	var clientID, clientSecret string
+	if platform == "mobile" {
+		clientID = os.Getenv("GOOGLE_ANDROID_CLIENT_ID")
+		clientSecret = os.Getenv("GOOGLE_ANDROID_CLIENT_SECRET")
+	}
+	// Fallback to web client if mobile envs are missing or for web platform
+	if clientID == "" {
+		clientID = os.Getenv("GOOGLE_WEB_CLIENT_ID")
+	}
+	if clientSecret == "" {
+		clientSecret = os.Getenv("GOOGLE_WEB_CLIENT_SECRET")
+	}
+	// Final fallback to legacy env names if the above are not set
+	if clientID == "" {
+		clientID = os.Getenv("GOOGLE_CLIENT_ID")
+	}
+	if clientSecret == "" {
+		clientSecret = os.Getenv("GOOGLE_CLIENT_SECRET")
+	}
+
 	return &oauth2.Config{
-		ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
-		ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
 		RedirectURL:  h.BaseURL + "/api/v1/auth/google/callback",
 		Scopes:       []string{"openid", "email", "profile"},
 		Endpoint:     google.Endpoint,
@@ -67,8 +89,8 @@ func (h *AuthHandler) HandleGoogleLogin(ctx *gin.Context) {
 	ctx.SetCookie("oauthState", oauthStateString, 300, "/", domain, secure, true)
 	ctx.SetCookie("oauthPlatform", platform, 300, "/", domain, secure, true)
 
-	// Generate Google OAuth URL
-	authURL := h.googleOauthConfig().AuthCodeURL(oauthStateString)
+	// Generate Google OAuth URL using platform-specific client
+	authURL := h.googleOauthConfig(platform).AuthCodeURL(oauthStateString)
 	ctx.Redirect(http.StatusTemporaryRedirect, authURL)
 }
 
@@ -97,13 +119,15 @@ func (h *AuthHandler) HandleGoogleCallback(ctx *gin.Context) {
 
 	requestCtx := ctx.Request.Context()
 
-	token, err := h.googleOauthConfig().Exchange(requestCtx, code)
+	// Use platform-specific oauth config for token exchange and API client
+	oauthCfg := h.googleOauthConfig(platform)
+	token, err := oauthCfg.Exchange(requestCtx, code)
 	if err != nil {
 		ctx.String(http.StatusInternalServerError, fmt.Sprintf("failed to exchange authorization for token: %v\n", err))
 		return
 	}
 
-	client := h.googleOauthConfig().Client(requestCtx, token)
+	client := oauthCfg.Client(requestCtx, token)
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
 	if err != nil {
 		ctx.String(http.StatusInternalServerError, fmt.Sprintf("Failed to get user info: %v", err))
