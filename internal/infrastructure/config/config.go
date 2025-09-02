@@ -25,7 +25,7 @@ func NewConfig() contract.IConfigProvider {
 		SendActivationEmail:          getEnvAsBool("SEND_ACTIVATION_EMAIL", false),
 		AppBaseURL:                   getEnv("APP_BASE_URL", "http://localhost:8080"),
 		FrontendBaseURL:              getEnv("FRONTEND_BASE_URL", "http://localhost:3000"),
-		FrontendMobileBaseURL:        getEnv("FRONTEND_MOBILE_BASE_URL", ""),
+		FrontendMobileBaseURL:        getEnv("FRONTEND_MOBILE_BASE_URL", "myapp://callback"),
 		RefreshTokenExpiry:           time.Hour * time.Duration(getEnvAsInt("REFRESH_TOKEN_EXPIRY_HOURS", 168)), // 7 days
 		PasswordResetTokenExpiry:     time.Minute * time.Duration(getEnvAsInt("PASSWORD_RESET_TOKEN_EXPIRY_MINUTES", 15)),
 		EmailVerificationTokenExpiry: time.Minute * time.Duration(getEnvAsInt("EMAIL_VERIFICATION_TOKEN_EXPIRY_MINUTES", 60)),

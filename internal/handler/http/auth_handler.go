@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/RealEskalate/G6-NewsBrief/internal/domain/contract"
 	"github.com/gin-gonic/gin"
@@ -133,12 +134,44 @@ func (h *AuthHandler) HandleGoogleCallback(ctx *gin.Context) {
 	
 	// Handle mobile app flow
 	if platform == "mobile" {
-		// For mobile, return JSON response with tokens
+		// For mobile, redirect to mobile app using deep link
+		mobileURL := h.config.GetFrontendMobileBaseURL()
+		if mobileURL != "" {
+			// Parse mobile deep link URL and add tokens as query parameters
+			u, err := url.Parse(mobileURL)
+			if err != nil {
+				ctx.String(http.StatusInternalServerError, "Invalid mobile URL configuration")
+				return
+			}
+			
+			// Add tokens as query parameters
+			query := u.Query()
+			query.Set("access_token", accessToken)
+			query.Set("refresh_token", refreshToken)
+			
+			// Add user ID if we can parse the token
+			if claims, err := h.jwtService.ParseAccessToken(accessToken); err == nil {
+				query.Set("user_id", claims.UserID)
+			}
+			
+			// Add platform indicator
+			query.Set("platform", "mobile")
+			query.Set("auth_method", "google")
+			
+			u.RawQuery = query.Encode()
+			
+			// Redirect to mobile app deep link
+			ctx.Redirect(http.StatusFound, u.String())
+			return
+		}
+		
+		// Fallback: return JSON if no mobile URL is configured
 		ctx.JSON(http.StatusOK, gin.H{
 			"message":       "login successful",
 			"access_token":  accessToken,
 			"refresh_token": refreshToken,
 			"platform":      "mobile",
+			"error":         "mobile deep link not configured",
 		})
 		return
 	}
